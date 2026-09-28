@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="lt" data-theme="light" data-style="liquid">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kaunas dviračiu</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{
+  --bg:#f5f7f9;--panel:#ffffff;--panel2:#f7f9fb;--ink:#16242b;--muted:#66757d;--line:#dfe7eb;
+  --accent:#e9553f;--accent2:#2d6cdf;--green:#1d9b67;--yellow:#e3a400;--shadow:0 14px 40px rgba(16,30,38,.18);
+  --glass:rgba(255,255,255,.78);--glass-strong:rgba(255,255,255,.9);--sheet-radius:26px;
+}
+html[data-theme="dark"]{
+  --bg:#10181d;--panel:#172229;--panel2:#1b2a32;--ink:#edf4f6;--muted:#9dafb7;--line:#2a3c45;
+  --accent:#ff725d;--accent2:#67a0ff;--green:#48d497;--yellow:#f2bf44;--shadow:0 18px 44px rgba(0,0,0,.35);
+  --glass:rgba(20,31,38,.78);--glass-strong:rgba(20,31,38,.92);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Inter,"Avenir Next",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit}
+button{cursor:pointer;color:inherit}
+#map{position:fixed;inset:0;background:#dfe7e9}
+.glass{background:var(--glass);backdrop-filter:blur(20px) saturate(1.18);-webkit-backdrop-filter:blur(20px) saturate(1.18);box-shadow:0 8px 28px rgba(0,0,0,.14);border:1px solid rgba(255,255,255,.38)}
+html[data-style="classic"] .glass{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none;border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.brand{position:fixed;z-index:800;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px;display:flex;align-items:center;gap:9px;padding:9px 13px;border-radius:18px;font-weight:800;letter-spacing:-.01em}
+.brandMark{width:27px;height:27px;border-radius:10px;display:grid;place-items:center;background:var(--accent);color:white;font-size:16px;box-shadow:0 5px 15px rgba(233,85,63,.32)}
+.brandTitle{white-space:nowrap}
+.topActions{position:fixed;z-index:800;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;display:flex;gap:8px}
+.iconBtn{width:44px;height:44px;border:0;border-radius:15px;display:grid;place-items:center;background:var(--glass);color:var(--ink);box-shadow:0 8px 28px rgba(0,0,0,.14);border:1px solid rgba(255,255,255,.38)}
+html[data-style="classic"] .iconBtn{background:var(--panel);border-color:var(--line)}
+.iconBtn svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#status{position:fixed;z-index:900;top:calc(env(safe-area-inset-top,0px) + 68px);left:50%;transform:translateX(-50%);max-width:min(620px,calc(100% - 28px));padding:9px 13px;border-radius:14px;font-size:.82rem;display:none}
+#status.show{display:flex;align-items:center;gap:8px}
+#status .spinner{width:14px;height:14px;border:2px solid rgba(127,127,127,.25);border-top-color:currentColor;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+#locationFab{position:fixed;z-index:700;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);width:50px;height:50px;border:0;border-radius:17px;display:grid;place-items:center;background:var(--glass-strong);box-shadow:0 10px 28px rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.38)}
+#locationFab svg{width:22px;height:22px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#locationFab.located svg{stroke:var(--accent2)}
+#scale{position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 94px);z-index:650;display:none}
+.leaflet-control-scale{margin:0!important;border:none!important;background:transparent!important;padding:0!important}
+.leaflet-control-scale-line{border:0!important;border-left:2px solid var(--ink)!important;border-bottom:2px solid var(--ink)!important;color:var(--ink)!important;background:var(--glass-strong)!important;border-radius:8px!important;padding:3px 7px!important;font-size:11px!important;font-weight:700!important;box-shadow:0 5px 15px rgba(0,0,0,.12)}
+
+#sheet{position:fixed;z-index:1000;left:50%;bottom:0;width:min(610px,calc(100vw - 24px));height:min(82vh,780px);background:var(--glass-strong);border:1px solid rgba(255,255,255,.45);border-bottom:0;border-radius:var(--sheet-radius) var(--sheet-radius) 0 0;box-shadow:var(--shadow);display:flex;flex-direction:column;transform:translate3d(-50%,100%,0);transition:transform .28s cubic-bezier(.22,.75,.24,1);overflow:hidden;will-change:transform}
+html[data-style="classic"] #sheet{background:var(--panel);border-color:var(--line)}
+#sheet.open{transform:translate3d(-50%,0,0)}
+#sheet.dragging{transition:none}
+#grab{padding:10px 0 8px;flex:none;touch-action:none}
+#grab i{display:block;width:44px;height:5px;border-radius:99px;background:var(--line);margin:auto}
+#body{overflow:auto;padding:2px 16px calc(118px + env(safe-area-inset-bottom,0px));-webkit-overflow-scrolling:touch;overscroll-behavior:contain;min-height:0}
+.pageHead{padding:5px 2px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.pageHead h1{font-size:1.42rem;line-height:1.1;margin:0;letter-spacing:-.025em}
+.pageHead p{margin:6px 0 0;color:var(--muted);font-size:.89rem;line-height:1.4}
+.closeBtn{border:0;background:var(--panel2);width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none}
+.closeBtn svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.sectionTitle{font-size:.76rem;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:18px 2px 9px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:19px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.04)}
+html[data-style="liquid"] .card{background:rgba(255,255,255,.34)}
+html[data-theme="dark"][data-style="liquid"] .card{background:rgba(255,255,255,.035)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px}
+.row+.row{border-top:1px solid var(--line)}
+.rowMain{min-width:0}.rowTitle{font-weight:760;font-size:.96rem}.rowSub{color:var(--muted);font-size:.78rem;margin-top:3px;line-height:1.35}
+.iconBox{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--panel2);flex:none}.iconBox svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.switch{width:48px;height:30px;border-radius:99px;border:0;background:var(--line);position:relative;flex:none;padding:0}.switch:after{content:"";position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.2);transition:.18s}.switch.on{background:var(--accent)}.switch.on:after{transform:translateX(18px)}
+
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:14px;padding:11px 14px;font-weight:720;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;transition:.16s}.btn:hover{transform:translateY(-1px)}.btn:active{transform:translateY(0)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 8px 18px rgba(233,85,63,.25)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn.secondary{background:var(--accent2);border-color:var(--accent2);color:#fff;box-shadow:0 8px 18px rgba(45,108,223,.2)}
+.btn.ghost{background:transparent}.btn.full{width:100%}.btn.iconOnly{width:44px;padding:0}
+.btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{border:1px solid var(--line);background:var(--panel2);border-radius:99px;padding:8px 11px;font-size:.82rem;font-weight:700}.chip.on{background:var(--accent2);border-color:var(--accent2);color:white}
+
+.navSearch{position:relative}.navInput{height:54px;width:100%;border:1px solid var(--line);border-radius:17px;background:var(--panel);padding:0 15px 0 46px;outline:none;color:var(--ink)}.navInput:focus{border-color:var(--accent2);box-shadow:0 0 0 4px rgba(45,108,223,.11)}.searchIcon{position:absolute;left:15px;top:17px;width:20px;height:20px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round}
+.searchResults{margin-top:7px;background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}.searchResults button{display:block;width:100%;border:0;background:none;text-align:left;padding:12px 13px;color:var(--ink)}.searchResults button+.searchResults button{border-top:1px solid var(--line)}
+.quickGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.quick{display:flex;align-items:center;gap:11px;padding:13px;border:1px solid var(--line);background:var(--panel);border-radius:17px;text-align:left}.quickIcon{width:35px;height:35px;border-radius:12px;display:grid;place-items:center;background:var(--panel2);font-size:17px}.quick strong{display:block;font-size:.88rem}.quick small{display:block;color:var(--muted);font-size:.74rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+.routeCard{border:1px solid var(--line);background:var(--panel);border-radius:18px;padding:13px;margin-top:11px}.routeTop{display:flex;align-items:center;justify-content:space-between;gap:10px}.routeMetric{font-size:1.34rem;font-weight:850;letter-spacing:-.02em}.routeMeta{font-size:.78rem;color:var(--muted)}
+.routeChoices{display:flex;gap:7px;overflow:auto;padding-bottom:2px;margin-top:12px}.routeChoice{min-width:118px;text-align:left;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:15px;padding:10px}.routeChoice.on{border-color:var(--accent2);box-shadow:inset 0 0 0 1px var(--accent2);background:rgba(45,108,223,.08)}.routeChoice strong{display:block;font-size:.82rem}.routeChoice span{display:block;font-size:.74rem;color:var(--muted);margin-top:2px}
+.steps{margin-top:13px;border-top:1px solid var(--line)}.step{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;padding:12px 2px;border-bottom:1px solid var(--line)}.stepIcon{width:34px;height:34px;border-radius:11px;background:var(--panel2);display:grid;place-items:center;font-weight:800}.stepMain b{font-size:.84rem;display:block}.stepMain span{font-size:.73rem;color:var(--muted);display:block;margin-top:3px}.stepDist{font-size:.72rem;color:var(--muted);white-space:nowrap}.step.active{background:rgba(45,108,223,.07);border-radius:14px;padding:10px}.step.active .stepIcon{background:var(--accent2);color:white}
+
+#pill{position:fixed;z-index:1100;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);transform:translateX(-50%);display:flex;gap:4px;padding:6px;border-radius:99px;background:var(--glass-strong);border:1px solid rgba(255,255,255,.42);box-shadow:0 12px 32px rgba(0,0,0,.22)}
+html[data-style="classic"] #pill{background:var(--panel);border-color:var(--line)}
+#pill button{border:0;background:transparent;color:var(--muted);padding:10px 18px;border-radius:99px;font-weight:800;display:flex;align-items:center;gap:8px;min-width:112px;justify-content:center}#pill button[aria-selected="true"]{background:var(--accent);color:white;box-shadow:0 7px 18px rgba(233,85,63,.22)}
+#pill svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+#centerPin{position:fixed;z-index:500;left:50%;top:50%;transform:translate(-50%,-100%);display:none;pointer-events:none}.pinHead{width:28px;height:28px;border-radius:50% 50% 50% 0;background:var(--accent);transform:rotate(-45deg);box-shadow:0 6px 16px rgba(0,0,0,.27);display:grid;place-items:center}.pinDot{width:8px;height:8px;border-radius:50%;background:white}.pinShadow{width:26px;height:8px;border-radius:50%;background:rgba(0,0,0,.25);filter:blur(3px);margin:10px auto 0;transform:scale(.75)}
+#pickBar{position:fixed;z-index:1050;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);transform:translateX(-50%);display:none;width:min(400px,calc(100% - 28px));padding:10px;border-radius:19px;background:var(--glass-strong);border:1px solid rgba(255,255,255,.4);box-shadow:var(--shadow)}.pickInfo{font-size:.78rem;color:var(--muted);margin-bottom:8px;text-align:center}.pickBtn{width:100%}
+
+#navMode{position:fixed;z-index:1200;inset:0;display:none;pointer-events:none}.navTop{position:absolute;left:14px;right:14px;top:calc(env(safe-area-inset-top,0px) + 12px);display:flex;justify-content:center}.instructionCard{pointer-events:auto;width:min(580px,100%);padding:14px 16px;border-radius:20px;background:var(--glass-strong);border:1px solid rgba(255,255,255,.44);box-shadow:var(--shadow)}.instructionSmall{font-size:.74rem;color:var(--muted);font-weight:750}.instructionMain{font-size:1.17rem;font-weight:850;margin-top:4px;display:flex;align-items:center;gap:10px}.turnArrow{width:28px;height:28px;border-radius:9px;background:var(--accent2);color:#fff;display:grid;place-items:center;font-weight:900}.instructionDist{font-size:.78rem;color:var(--muted);margin-top:3px}.navBottom{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;justify-content:center}.navBottomCard{pointer-events:auto;width:min(580px,100%);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border-radius:19px;background:var(--glass-strong);border:1px solid rgba(255,255,255,.44);box-shadow:var(--shadow)}.navBottomCard .eta{font-weight:850}.navBottomCard .eta small{display:block;color:var(--muted);font-weight:650;font-size:.72rem;margin-top:2px}
+
+.poiPopup{min-width:245px}.poiTitle{font-size:1.02rem;font-weight:850;margin-bottom:3px}.poiType{font-size:.74rem;color:var(--muted);margin-bottom:10px}.poiLine{display:flex;align-items:flex-start;gap:8px;font-size:.81rem;margin:7px 0}.poiLine b{font-size:.79rem}.poiActions{display:flex;gap:7px;margin-top:11px}.poiActions button{flex:1;border:0;border-radius:12px;padding:9px 10px;font-weight:780}.poiActions .go{background:var(--accent2);color:#fff}.poiActions .edit{background:#eef2f4;color:#203039}.hoursMissing{color:var(--yellow)}
+
+
+#settingsPage{position:fixed;inset:0;z-index:1400;display:none;background:var(--bg);color:var(--ink)}
+#settingsPage.open{display:block}
+.settingsShell{height:100%;width:min(760px,100%);margin:0 auto;overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px calc(28px + env(safe-area-inset-bottom,0px))}
+.settingsTop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.settingsTop h1{font-size:1.65rem;margin:0;letter-spacing:-.03em}.settingsTop p{margin:5px 0 0;color:var(--muted);font-size:.9rem}.settingsClose{width:44px;height:44px;border:0;border-radius:14px;background:var(--panel);border:1px solid var(--line);font-size:1.5rem;display:grid;place-items:center}
+html.pick-active .brand,html.pick-active .topActions,html.pick-active #locationFab,html.pick-active #pill,html.pick-active .leaflet-control-zoom,html.pick-active .leaflet-control-attribution{display:none!important}
+html.pick-active #sheet{display:none!important}
+#modal{position:fixed;inset:0;z-index:1500;background:rgba(3,10,14,.44);display:none;align-items:flex-end;justify-content:center;padding:14px}.modalCard{width:min(600px,100%);background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:16px;box-shadow:var(--shadow)}.modalHead{display:flex;align-items:center;justify-content:space-between;gap:10px}.modalHead h2{font-size:1.15rem;margin:0}.modalCard p{color:var(--muted);font-size:.8rem;line-height:1.4}.modalInput{width:100%;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:14px;padding:12px;outline:none}.modalInput:focus{border-color:var(--accent2);box-shadow:0 0 0 4px rgba(45,108,223,.1)}.modalActions{display:flex;gap:8px;margin-top:10px}.modalActions .btn{flex:1}
+
+.empty{padding:18px 12px;color:var(--muted);text-align:center;font-size:.84rem}.errorBox{padding:12px 14px;border:1px solid rgba(233,85,63,.35);background:rgba(233,85,63,.08);border-radius:15px;font-size:.8rem;color:var(--ink)}
+.divider{height:1px;background:var(--line);margin:17px 0}
+.textInput{width:100%;border:1px solid var(--line);background:var(--panel2);color:var(--ink);padding:12px 13px;border-radius:14px;outline:none}.textInput:focus{border-color:var(--accent2);box-shadow:0 0 0 4px rgba(45,108,223,.1)}
+.settingOption{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;background:var(--panel);border:1px solid var(--line);border-radius:15px}.settingOption+.settingOption{margin-top:8px}.settingOption b{display:block;font-size:.86rem}.settingOption span{display:block;color:var(--muted);font-size:.73rem;margin-top:2px}.seg{display:flex;background:var(--panel2);border:1px solid var(--line);padding:3px;border-radius:13px;gap:3px}.seg button{border:0;background:transparent;border-radius:10px;padding:8px 10px;font-size:.76rem;font-weight:780}.seg button.on{background:var(--accent2);color:#fff}
+
+.leaflet-control-zoom{border:0!important;box-shadow:0 9px 24px rgba(0,0,0,.14)!important;margin-top:calc(env(safe-area-inset-top,0px) + 66px)!important;margin-right:14px!important}.leaflet-control-zoom a{width:42px!important;height:42px!important;line-height:42px!important;background:var(--glass-strong)!important;color:var(--ink)!important;border:0!important;text-align:center!important}.leaflet-control-zoom a:first-child{border-radius:14px 14px 0 0;border-bottom:1px solid var(--line)!important}.leaflet-control-zoom a:last-child{border-radius:0 0 14px 14px}.leaflet-control-attribution{font-size:8px!important;background:rgba(255,255,255,.72)!important}
+@media (min-width:800px){#locationFab{bottom:28px;right:24px}.brand{left:18px}.topActions{right:18px}}
+@media (max-width:500px){#sheet{height:86vh}.brandTitle{display:none}.brand{width:44px;height:44px;padding:0;justify-content:center}.quick small{max-width:120px}#pill button{min-width:126px;padding-inline:15px}}
+
+/* ---------- polish / interaction ---------- */
+html,body,#mapScene,.glass,.card,.row,.btn,.iconBtn,.closeBtn,.settingOption,.navBottomCard,.instructionCard,.routeCard,.mainSearchBox,.mainSearchResults{
+  transition:background-color .42s ease,color .42s ease,border-color .42s ease,box-shadow .42s ease,filter .42s ease;
+}
+button,input{ -webkit-tap-highlight-color:transparent; }
+button:focus,input:focus{outline:none}
+button:focus-visible,input:focus-visible{box-shadow:0 0 0 3px rgba(233,85,63,.16)}
+#mapScene{position:fixed;inset:-10%;transform-origin:50% 50%;will-change:transform;transition:transform .32s cubic-bezier(.22,.72,.24,1)}
+#map{position:absolute;inset:0}
+html[data-theme="dark"] .leaflet-tile-pane{filter:invert(.92) hue-rotate(180deg) saturate(.72) brightness(.82);transition:filter .46s ease}
+html[data-theme="light"] .leaflet-tile-pane{filter:none;transition:filter .46s ease}
+html.nav-active .brand,
+html.nav-active .topActions,
+html.nav-active #pill,
+html.nav-active .leaflet-control-zoom,
+html.nav-active .leaflet-control-attribution,
+html.nav-active #mainSearch{display:none!important}
+html.nav-active #locationFab{z-index:1350}
+html.pick-active #mainSearch{display:none!important}
+
+#mainSearch{
+  position:fixed;z-index:850;left:50%;width:min(540px,calc(100% - 28px));
+  transform:translateX(-50%);transition:top .2s ease,bottom .2s ease,opacity .2s ease;
+}
+#mainSearch[data-position="top"]{top:calc(env(safe-area-inset-top,0px) + 74px)}
+#mainSearch[data-position="bottom"]{bottom:calc(env(safe-area-inset-bottom,0px) + 72px)}
+html.sheet-open #mainSearch,html.settings-open #mainSearch{display:none}
+.mainSearchBox{height:52px;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--glass-strong);border:1px solid rgba(255,255,255,.44);box-shadow:0 10px 30px rgba(0,0,0,.17);border-radius:18px;backdrop-filter:blur(20px) saturate(1.18);-webkit-backdrop-filter:blur(20px) saturate(1.18)}
+html[data-style="classic"] .mainSearchBox{background:var(--panel);border-color:var(--line);backdrop-filter:none;-webkit-backdrop-filter:none}
+.mainSearchBox svg{width:20px;height:20px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;flex:none}
+#mainSearchInput{min-width:0;flex:1;border:0;background:transparent;color:var(--ink);font-size:.92rem;outline:none}
+.mainSearchClear{border:0;background:var(--panel2);width:30px;height:30px;border-radius:10px;font-size:1.1rem;line-height:1;color:var(--muted)}
+.mainSearchResults{margin-top:7px;overflow:hidden;background:var(--glass-strong);border:1px solid rgba(255,255,255,.42);border-radius:17px;box-shadow:0 10px 30px rgba(0,0,0,.16);backdrop-filter:blur(20px) saturate(1.18);-webkit-backdrop-filter:blur(20px) saturate(1.18)}
+html[data-style="classic"] .mainSearchResults{background:var(--panel);border-color:var(--line);backdrop-filter:none;-webkit-backdrop-filter:none}
+.mainSearchResults button{display:flex;gap:10px;width:100%;padding:12px 13px;border:0;background:transparent;color:var(--ink);text-align:left}
+.mainSearchResults button+button{border-top:1px solid var(--line)}
+.mainSearchResults .resultIcon{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:var(--panel2);flex:none}
+.mainSearchResults .resultName{font-weight:750;font-size:.84rem;line-height:1.2}
+.mainSearchResults .resultAddress{color:var(--muted);font-size:.72rem;margin-top:3px;line-height:1.25}
+
+.layerLead{padding:2px 2px 13px}
+.layerLead h1{margin:0;font-size:1.45rem;letter-spacing:-.03em}
+.layerLead p{margin:6px 0 0;color:var(--muted);font-size:.83rem;line-height:1.35}
+.layerSection{font-size:.73rem;font-weight:850;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:16px 2px 8px}
+.layerRows{display:grid;gap:9px}
+.layerRow{display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--line);background:var(--panel);border-radius:17px}
+html[data-style="liquid"] .layerRow{background:rgba(255,255,255,.30)}
+html[data-theme="dark"][data-style="liquid"] .layerRow{background:rgba(255,255,255,.035)}
+.layerInfo{min-width:0;flex:1}
+.layerName{font-weight:780;font-size:.91rem}
+.layerSub{font-size:.73rem;color:var(--muted);margin-top:2px;line-height:1.3}
+.layerBadge{font-size:.66rem;font-weight:800;color:var(--muted);margin-top:4px}
+.layerStatus{font-size:.69rem;color:var(--muted);margin-top:3px}
+.layerStatus.error{color:var(--accent)}
+.layerStatus.loading{color:var(--accent2)}
+.layerAction{width:48px;height:30px;border-radius:99px;border:0;background:var(--line);position:relative;flex:none}
+.layerAction:after{content:"";position:absolute;width:22px;height:22px;left:4px;top:4px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.2);transition:transform .18s ease}
+.layerAction.on{background:var(--accent)}
+.layerAction.on:after{transform:translateX(18px)}
+.layerFoot{margin-top:12px;padding:11px 12px;border-radius:14px;background:var(--panel2);color:var(--muted);font-size:.72rem;line-height:1.4}
+
+#sheet.route-peek{transform:translate3d(-50%,calc(100% - 190px),0)}
+.routeDetails{margin-top:10px}
+.routePeekHint{padding:9px 12px;background:var(--panel2);border-radius:13px;color:var(--muted);font-size:.72rem;text-align:center;margin-top:9px}
+.routeSummaryCard{border:1px solid var(--line);background:var(--panel);border-radius:18px;padding:13px}
+.routeSummaryCard .distanceOnly{font-size:2rem;font-weight:900;letter-spacing:-.04em}
+.routeSummaryCard .summarySub{color:var(--muted);font-size:.74rem;margin-top:2px}
+.routeSummaryActions{display:flex;gap:8px;margin-top:10px}.routeSummaryActions .btn{flex:1}
+.sheet:not(.route-peek) .routePeekHint{display:none}
+.routeDetails .sectionTitle{margin-top:15px}
+
+.stepStreet{display:block;font-size:.74rem;font-weight:700;margin-top:2px}
+.stepMeta{display:block;color:var(--muted);font-size:.69rem;margin-top:2px}
+.stepTag{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:3px 7px;border-radius:99px;background:var(--panel2);color:var(--muted);font-size:.64rem;font-weight:800}
+
+.navBottomCard{display:block!important;overflow:hidden}
+.navBottomHead{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.navExpand{width:36px;height:36px;border-radius:12px;border:0;background:var(--panel2);color:var(--ink);font-size:1.05rem}
+.navBottomCard.expanded .navExpand{transform:rotate(180deg)}
+.navTurnList{display:none;border-top:1px solid var(--line);margin:10px 0 0;padding-top:5px;max-height:46vh;overflow:auto}
+.navBottomCard.expanded .navTurnList{display:block}
+.navTurn{display:grid;grid-template-columns:34px 1fr auto;gap:9px;align-items:center;padding:9px 2px;border-bottom:1px solid var(--line)}
+.navTurn:last-child{border-bottom:0}
+.navTurnIcon{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:var(--panel2);font-weight:850}
+.navTurnText{font-weight:760;font-size:.79rem}.navTurnStreet{display:block;color:var(--muted);font-size:.69rem;margin-top:2px}
+.navTurnDist{font-size:.68rem;color:var(--muted);white-space:nowrap}
+.navExit{margin-top:10px}
+
+html.nav-active #locationFab{bottom:calc(env(safe-area-inset-bottom,0px) + 18px)}
+html.nav-active .navBottom{bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
+.nav-active .instructionCard{backdrop-filter:blur(22px) saturate(1.2);-webkit-backdrop-filter:blur(22px) saturate(1.2)}
+
+.gpsMarker{position:relative;width:34px;height:34px;transform-origin:50% 50%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.22))}
+.gpsMarker .gpsDot{position:absolute;left:50%;top:55%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#2d6cdf;border:3px solid #fff;box-shadow:0 0 0 1px rgba(20,35,50,.15)}
+.gpsMarker .gpsArrow{position:absolute;left:50%;top:2px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:16px solid #2d6cdf}
+.gpsMarker .gpsRing{position:absolute;left:50%;top:55%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;border:2px solid rgba(45,108,223,.20)}
+
+.leaflet-control-zoom{border:0!important;box-shadow:none!important;margin-top:calc(env(safe-area-inset-top,0px) + 68px)!important;margin-right:14px!important}
+.leaflet-control-zoom a{width:42px!important;height:42px!important;line-height:42px!important;background:var(--glass-strong)!important;color:var(--ink)!important;border:1px solid rgba(255,255,255,.35)!important;text-align:center!important;border-radius:14px!important;margin-top:7px!important;box-shadow:0 9px 24px rgba(0,0,0,.14)!important}
+html[data-style="classic"] .leaflet-control-zoom a{background:var(--panel)!important;border-color:var(--line)!important}
+
+</style>
+</head>
+<body>
+<div id="mapScene"><div id="map"></div></div>
+<div class="brand glass"><div class="brandMark">🚲</div><div class="brandTitle">Kaunas dviračiu</div></div>
+<div class="topActions">
+  <button class="iconBtn" id="settingsBtn" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06-1.9 1.9-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V20h-2.68v-.11A1.7 1.7 0 0 0 9.2 18.3a1.7 1.7 0 0 0-1.87.34l-.06.06-1.9-1.9.06-.06A1.7 1.7 0 0 0 5.77 15a1.7 1.7 0 0 0-1.56-1.04H4v-2.7h.11A1.7 1.7 0 0 0 5.8 10.2a1.7 1.7 0 0 0-.34-1.87l-.06-.06 1.9-1.9.06.06A1.7 1.7 0 0 0 9.2 6.77 1.7 1.7 0 0 0 10.24 5.2V5h2.68v.2A1.7 1.7 0 0 0 14 6.77a1.7 1.7 0 0 0 1.87-.34l.06-.06 1.9 1.9-.06.06A1.7 1.7 0 0 0 17.43 10a1.7 1.7 0 0 0 1.56 1.04H19v2.7h-.01A1.7 1.7 0 0 0 19.4 15Z"/></svg></button>
+</div>
+<div id="status" class="glass"><span class="spinner"></span><span id="statusText"></span></div>
+<div id="mainSearch" class="mainSearch top">
+  <div class="mainSearchBox">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+    <input id="mainSearchInput" autocomplete="off" placeholder="Ieškoti adreso ar vietos">
+    <button id="mainSearchClear" class="mainSearchClear" aria-label="Clear search" hidden>×</button>
+  </div>
+  <div id="mainSearchResults" class="mainSearchResults"></div>
+</div>
+<button id="locationFab" aria-label="Center on my location"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></button>
+<div id="scale"></div>
+<div id="centerPin"><div class="pinHead"><div class="pinDot"></div></div><div class="pinShadow"></div></div>
+<div id="pickBar"><div class="pickInfo" id="pickInfo"></div><button class="btn primary pickBtn" id="pickSelect">Select this location</button></div>
+
+<div id="sheet"><div id="grab"><i></i></div><div id="body"></div></div>
+<div id="pill">
+  <button id="tMap" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
+  <button id="tNav" aria-selected="false"><svg viewBox="0 0 24 24"><path d="m3 11 18-8-8 18-2-8-7-2Z"/></svg><span>Navigate</span></button>
+</div>
+
+<div id="navMode">
+  <div class="navTop">
+    <div class="instructionCard">
+      <div class="instructionSmall" id="navSmall"></div>
+      <div class="instructionMain"><div class="turnArrow" id="turnArrow">↑</div><div id="navInstruction"></div></div>
+      <div class="instructionDist" id="navInstructionDist"></div>
+    </div>
+  </div>
+  <div class="navBottom">
+    <div class="navBottomCard" id="navBottomCard">
+      <div class="navBottomHead">
+        <div class="eta" id="navEta"></div>
+        <button class="navExpand" id="navExpand" aria-label="Show upcoming turns">⌃</button>
+      </div>
+      <div class="navTurnList" id="navTurnList"></div>
+      <button class="btn primary full navExit" id="stopNav">Exit navigation</button>
+    </div>
+  </div>
+</div>
+
+<div id="settingsPage"><div class="settingsShell"><div class="settingsTop"><div><h1 id="settingsTitle">Settings</h1><p id="settingsSubtitle"></p></div><button class="settingsClose" id="settingsClose" aria-label="Close settings">×</button></div><div id="settingsBody"></div></div></div>
+<div id="modal"><div class="modalCard" id="modalBody"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const T={
+ lt:{map:"Žemėlapis",nav:"Navigacija",settings:"Nustatymai",layers:"Sluoksniai",layersSub:"Rodyti dviračiams naudingą informaciją žemėlapyje.",
+   cycle:"Dviračių infrastruktūra",shops:"Dviračių parduotuvės",repair:"Remonto stotelės",rental:"Dviračių nuoma",on:"Įjungta",off:"Išjungta",retry:"Bandyti dar kartą",
+   home:"Namai",work:"Darbas",homeSet:"Nustatyti namų adresą",workSet:"Nustatyti darbo adresą",quick:"Greitai į…",search:"Ieškoti adreso ar vietos",from:"Iš",to:"Į",gps:"Naudoti dabartinę vietą",pick:"Pasirinkti žemėlapyje",clear:"Išvalyti",
+   finding:"Ieškoma maršruto…",routeErr:"Nepavyko rasti maršruto",routeSource:"Dviračių maršrutas iš BRouter + OpenStreetMap",routes:"Maršrutai",recommended:"Dviračiams tinkamiausias",balanced:"Subalansuotas",fast:"Greitas",
+   start:"Pradėti navigaciją",stop:"Baigti navigaciją",steps:"Posūkiai",emptySteps:"Posūkių kol kas nėra",locating:"Nustatoma vieta…",locErr:"Nepavyko gauti vietos",located:"Vieta nustatyta",center:"Centruoti pagal vietą",
+   settingsSub:"Prisitaikyk programėlę sau.",language:"Kalba",theme:"Tema",light:"Šviesi",dark:"Tamsi",time:"Pagal paros laiką",style:"Stilius",liquid:"Liquid glass",classic:"Klasikinis",scale:"Žemėlapio mastelis",never:"Niekada",always:"Visada",zoomOnly:"Rodant / keičiant mastelį",searchPosition:"Paieškos vieta",searchTop:"Viršuje",searchBottom:"Virš navigacijos juostos",
+   places:"Išsaugotos vietos",save:"Išsaugoti",saved:"Išsaugota",address:"Adresas",hours:"Darbo laikas",hoursMapped:"Darbo laikas iš OpenStreetMap",hoursLocal:"Mano įrašytas darbo laikas",hoursMissing:"Darbo laikas nenurodytas",editHours:"Redaguoti darbo laiką",saveHours:"Išsaugoti darbo laiką",cancel:"Atšaukti",hoursHint:"Įrašykite, pvz. Pr–Pn 09:00–18:00; Še 10:00–15:00",navigate:"Naviguoti",phone:"Telefonas",website:"Svetainė",noAddress:"Adresas nenurodytas",openInMap:"Rodyti žemėlapyje",pickInfo:"Perstumkite žemėlapį taip, kad smeigtukas būtų norimoje vietoje.",select:"Pasirinkti šią vietą",savedHome:"Išsaugoti kaip namus",savedWork:"Išsaugoti kaip darbą",routeToHome:"Į namus",routeToWork:"Į darbą",notSet:"Nenustatyta",
+   nextTurn:"Kitas posūkis",continue:"Tęskite tiesiai",turnLeft:"Pasukite kairėn",turnRight:"Pasukite dešinėn",arrive:"Jūs pasiekėte kelionės tikslą",inDistance:d=>d<1000?`${Math.round(d)} m`:`${(d/1000).toFixed(1)} km`,minutes:m=>`${Math.max(1,Math.round(m/60))} min`,eta:"Atvykimas",distance:d=>`${(d/1000).toFixed(1)} km`,live:"GPS navigacija aktyvi",noRoute:"Pirmiausia pasirinkite kelionės tikslą",layerError:"Nepavyko įkelti šio sluoksnio"},
+ en:{map:"Map",nav:"Navigate",settings:"Settings",layers:"Layers",layersSub:"Show useful cycling information on the map.",cycle:"Cycling infrastructure",shops:"Bike shops",repair:"Repair stations",rental:"Bike rental",on:"On",off:"Off",retry:"Retry",
+   home:"Home",work:"Work",homeSet:"Set home address",workSet:"Set work address",quick:"Quick routes",search:"Search address or place",from:"From",to:"To",gps:"Use current location",pick:"Pick on map",clear:"Clear",
+   finding:"Finding bike route…",routeErr:"Couldn't find a route",routeSource:"Cycling route from BRouter + OpenStreetMap",routes:"Routes",recommended:"Bike-friendly",balanced:"Balanced",fast:"Fast",
+   start:"Start navigation",stop:"Exit navigation",steps:"Turns",emptySteps:"No turn instructions yet",locating:"Getting your location…",locErr:"Couldn't get your location",located:"Location found",center:"Center on my location",
+   settingsSub:"Make the app feel like yours.",language:"Language",theme:"Theme",light:"Light",dark:"Dark",time:"By time of day",style:"Style",liquid:"Liquid glass",classic:"Classic",scale:"Map scale",never:"Never",always:"Always",zoomOnly:"While zooming / changing zoom",searchPosition:"Search bar position",searchTop:"Top",searchBottom:"Above the bottom pill",
+   places:"Saved places",save:"Save",saved:"Saved",address:"Address",hours:"Opening hours",hoursMapped:"Opening hours from OpenStreetMap",hoursLocal:"My saved opening hours",hoursMissing:"Opening hours not listed",editHours:"Edit opening hours",saveHours:"Save opening hours",cancel:"Cancel",hoursHint:"Example: Mon–Fri 09:00–18:00; Sat 10:00–15:00",navigate:"Navigate",phone:"Phone",website:"Website",noAddress:"Address not listed",openInMap:"Show on map",pickInfo:"Move the map until the pin is exactly where you want it.",select:"Select this location",savedHome:"Save as home",savedWork:"Save as work",routeToHome:"Home",routeToWork:"Work",notSet:"Not set",
+   nextTurn:"Next turn",continue:"Continue straight",turnLeft:"Turn left",turnRight:"Turn right",arrive:"You have arrived",inDistance:d=>d<1000?`${Math.round(d)} m`:`${(d/1000).toFixed(1)} km`,minutes:m=>`${Math.max(1,Math.round(m/60))} min`,eta:"Arrival",distance:d=>`${(d/1000).toFixed(1)} km`,live:"GPS navigation active",noRoute:"Choose a destination first",layerError:"Couldn’t load this layer"}
+};
+let lang="lt";
+try{lang=localStorage.getItem("kb-lang")||((navigator.language||"").toLowerCase().startsWith("lt")?"lt":"en")}catch{lang=((navigator.language||"").toLowerCase().startsWith("lt")?"lt":"en")}
+if(!T[lang]) lang="lt";
+const t=k=>T[lang][k];
+const store={get(k,f=null){try{const v=localStorage.getItem("kb-"+k);return v===null?f:JSON.parse(v)}catch{return f}},set(k,v){try{localStorage.setItem("kb-"+k,JSON.stringify(v))}catch{}}};
+
+const map=L.map("map",{zoomControl:false,preferCanvas:true,minZoom:11,maxZoom:19,maxBounds:[[54.76,23.66],[55.03,24.25]],maxBoundsViscosity:.72}).setView([54.8985,23.93],13);
+L.control.zoom({position:"topright"}).addTo(map);
+const lightTiles=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors",crossOrigin:true}).addTo(map);
+const scale=L.control.scale({imperial:false,metric:true,maxWidth:110,position:"bottomleft"});
+scale.addTo(map); scale._container.id="leafletScale";
+function applyMapTheme(){document.documentElement.dataset.mapTheme=document.documentElement.dataset.theme==="dark"?"dark":"light"}
+
+let settings={language:lang,theme:store.get("theme","light"),style:store.get("style","liquid"),scale:store.get("scale","zoom"),searchPosition:store.get("searchPosition","top")};
+function setTheme(v){settings.theme=v;store.set("theme",v);applyTheme();renderSettings()}
+function autoTheme(){const h=new Date().getHours();return h>=7&&h<20?"light":"dark"}
+function applyTheme(){
+  const next=settings.theme==="time"?autoTheme():settings.theme;
+  document.documentElement.dataset.theme=next;document.documentElement.dataset.style=settings.style;applyMapTheme();updateScaleVisibility();applySearchPosition();
+}
+function tickTheme(){if(settings.theme==="time")applyTheme()}
+setInterval(tickTheme,60000); applyTheme();
+let scaleTimer=null;
+function updateScaleVisibility(){
+  const el=$("leafletScale");if(!el)return;
+  if(scaleTimer)clearTimeout(scaleTimer);
+  map.off("zoomstart",showScale);map.off("zoomend",showScale);
+  if(settings.scale==="always"){el.style.display="block"}
+  else if(settings.scale==="never"){el.style.display="none"}
+  else{el.style.display="none";map.on("zoomstart",showScale);map.on("zoomend",showScale)}
+}
+function showScale(){const el=$("leafletScale");if(!el)return;el.style.display="block";if(scaleTimer)clearTimeout(scaleTimer);scaleTimer=setTimeout(()=>{if(settings.scale==="zoom")el.style.display="none"},1800)}
+
+function status(msg,busy=false){const s=$("status");if(!msg){s.classList.remove("show");return}s.classList.add("show");$("statusText").textContent=msg;s.querySelector(".spinner").style.display=busy?"block":"none"}
+
+// ---------------- Layers / OSM data ----------------
+const layerState={cycle:false,shops:false,repair:false,rental:false};
+const layerGroups={shops:L.layerGroup(),repair:L.layerGroup(),rental:L.layerGroup()};
+const layerCache={shops:null,repair:null,rental:null};
+const layerLoading={}; const layerMessages={}; const layerLastCenter={};
+const cycleTiles=L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm-lite/{z}/{x}/{y}.png",{
+  maxZoom:20,opacity:.88,attribution:"© CyclOSM · © OpenStreetMap contributors"
+});
+const EPS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter","https://overpass.private.coffee/api/interpreter"];
+function bboxForQuery(pad=.0015){const b=map.getBounds();let s=b.getSouth()-pad,w=b.getWest()-pad,n=b.getNorth()+pad,e=b.getEast()+pad;if(n-s>.16){const c=(s+n)/2;s=c-.08;n=c+.08}if(e-w>.24){const c=(w+e)/2;w=c-.12;e=c+.12}return `${s.toFixed(5)},${w.toFixed(5)},${n.toFixed(5)},${e.toFixed(5)}`}
+async function overpass(q){
+  let last;
+  for(const ep of EPS){
+    try{
+      const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
+      let res=await fetch(ep+"?data="+encodeURIComponent(q),{mode:"cors",cache:"no-store",signal:ctl.signal});
+      clearTimeout(timer);
+      if(!res.ok)throw new Error("HTTP "+res.status);
+      const j=await res.json();
+      if(!j||!Array.isArray(j.elements))throw new Error("Invalid response");
+      return j;
+    }catch(e){last=e}
+  }
+  throw last||new Error("Overpass unavailable")
+}
+function layerIcon(kind){return kind==="shops"?"🚲":kind==="repair"?"🔧":"🚴"}
+function parseLL(e){return e.center?[e.center.lat,e.center.lon]:[e.lat,e.lon]}
+function osmAddress(tg){const p=[tg["addr:street"],tg["addr:housenumber"]].filter(Boolean).join(" ");if(!p&&!tg["addr:postcode"]&&!tg["addr:city"])return null;return [p,tg["addr:postcode"],tg["addr:city"]||"Kaunas"].filter(Boolean).join(", ")}
+function hoursFor(kind,id,tg){return store.get("hours",{})[kind+":"+id]||tg.opening_hours||null}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]||m))}
+function websiteVal(tg){return tg.website||tg["contact:website"]||tg.url||null}
+function phoneVal(tg){return tg.phone||tg["contact:phone"]||null}
+function showPOIPopup(e,kind){
+  const tg=e.tags||{},ll=parseLL(e),name=tg.name||({shops:t("shops"),repair:t("repair"),rental:t("rental")}[kind]);
+  const h=hoursFor(kind,e.id,tg),addr=osmAddress(tg)||t("noAddress"),phone=phoneVal(tg),web=websiteVal(tg);
+  let html=`<div class="poiPopup"><div class="poiTitle">${esc(name)}</div><div class="poiType">${esc(kind==="shops"?t("shops"):kind==="repair"?t("repair"):t("rental"))}</div><div class="poiLine">📍 <span>${esc(addr)}</span></div>`;
+  if(h)html+=`<div class="poiLine">🕒 <span><b>${esc(t("hours"))}</b><br>${esc(h)}<br><small style="color:var(--muted)">${tg.opening_hours?t("hoursMapped"):t("hoursLocal")}</small></span></div>`;
+  else html+=`<div class="poiLine hoursMissing">🕒 <span>${esc(t("hoursMissing"))}</span></div>`;
+  if(phone)html+=`<div class="poiLine">☎ <span><a href="tel:${esc(phone)}">${esc(phone)}</a></span></div>`;
+  if(web)html+=`<div class="poiLine">🌐 <span><a href="${esc(web)}" target="_blank" rel="noopener">${esc(web.replace(/^https?:\/\//,''))}</a></span></div>`;
+  html+=`<div class="poiActions"><button class="go" data-action="navigate">${t("navigate")}</button><button class="edit" data-action="hours">${t("editHours")}</button></div></div>`;
+  const pop=L.popup({maxWidth:310,minWidth:255,closeButton:true}).setLatLng(ll).setContent(html);
+  map.once("popupopen",()=>{
+    const el=pop.getElement();if(!el)return;
+    el.querySelector('[data-action="navigate"]')?.addEventListener("click",()=>{map.closePopup();setDestinationFromPOI(e,kind)});
+    el.querySelector('[data-action="hours"]')?.addEventListener("click",()=>{map.closePopup();openHoursModal(kind,e.id,name,h||"")});
+  });
+  pop.openOn(map);
+}
+function drawLayer(kind){
+  const g=layerGroups[kind];if(!g)return;g.clearLayers();
+  const color={shops:"#276d8a",repair:"#d6a000",rental:"#2c9f6a"}[kind];
+  for(const e of layerCache[kind]||[]){
+    if(!e.geometry&&!e.center&&!e.lat)continue;
+    const ll=parseLL(e),tg=e.tags||{};
+    const marker=L.marker(ll,{icon:L.divIcon({className:"poiDot",html:`<div style="width:30px;height:30px;border-radius:11px;background:${color};border:2px solid #fff;display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,.22);font-size:15px">${layerIcon(kind)}</div>`,iconSize:[30,30],iconAnchor:[15,15]})});
+    marker.on("click",()=>showPOIPopup(e,kind));marker.addTo(g);
+  }
+}
+function setLayerMessage(kind,msg,busy=false){
+  layerMessages[kind]=busy?`__LOADING__${msg}`:msg;
+  const el=$(`layerMsg-${kind}`);if(!el)return;
+  el.className="layerStatus "+(busy?"loading":msg?"error":"");
+  el.textContent=busy?msg:msg;
+  el.style.display=msg?"block":"none";
+}
+async function loadLayer(kind){
+  if(layerLoading[kind])return;
+  layerLoading[kind]=true;layerLastCenter[kind]=map.getCenter();setLayerMessage(kind,t("finding"),true);
+  const bb=bboxForQuery();
+  let q="";
+  if(kind==="shops")q=`[out:json][timeout:20];nwr["shop"="bicycle"](${bb});out center qt;`;
+  else if(kind==="repair")q=`[out:json][timeout:20];(nwr["amenity"="bicycle_repair_station"](${bb});nwr["service:bicycle:repair"~"^(yes|only)$"](${bb}););out center qt;`;
+  else q=`[out:json][timeout:20];(nwr["amenity"="bicycle_rental"](${bb});nwr["rental"="bicycle"](${bb}););out center qt;`;
+  try{
+    const j=await overpass(q);layerCache[kind]=j.elements||[];drawLayer(kind);setLayerMessage(kind,"",false);renderMap();
+  }catch(e){
+    setLayerMessage(kind,(lang==="lt"?"Nepavyko įkelti: ":"Couldn’t load: ")+(e?.message||"network error"),false);
+    renderMap();
+  }finally{layerLoading[kind]=false}
+}
+function toggleLayer(kind){
+  layerState[kind]=!layerState[kind];
+  if(kind==="cycle"){
+    if(layerState[kind])cycleTiles.addTo(map);else map.removeLayer(cycleTiles);
+  }else if(layerState[kind]){
+    layerGroups[kind].addTo(map);if(!layerCache[kind])loadLayer(kind);else drawLayer(kind);
+  }else map.removeLayer(layerGroups[kind]);
+  renderMap();
+}
+map.on("moveend",()=>{
+  const c=map.getCenter();if(!c)return;
+  for(const k of ["shops","repair","rental"])if(layerState[k]&&!layerLoading[k]){
+    const prev=layerLastCenter[k];
+    if(!layerCache[k]||!prev||map.distance(prev,c)>1800)loadLayer(k);
+  }
+  updateCenteredState();
+});
+
+// ---------------- GPS ----------------
+let userPosition=null,userMarker=null,userAccuracy=null,watchId=null,lastHeading=null,centeredOnUser=false,lastGpsPosition=null;
+function gpsIcon(angle=0){
+  return L.divIcon({className:"gpsIcon",html:`<div class="gpsMarker" style="transform:rotate(${angle}deg)"><div class="gpsArrow"></div><div class="gpsRing"></div><div class="gpsDot"></div></div>`,iconSize:[34,34],iconAnchor:[17,17]});
+}
+function updateCenteredState(){
+  if(!userPosition){centeredOnUser=false;$("locationFab").classList.remove("located");return}
+  const d=map.distance(map.getCenter(),userPosition);
+  const close=d<45 && map.getZoom()>=15;
+  centeredOnUser=close;
+  $("locationFab").classList.toggle("located",close);
+}
+function headingFrom(a,b){
+  if(!a||!b)return null;
+  const lat1=a[0]*Math.PI/180,lat2=b[0]*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180;
+  const y=Math.sin(dl)*Math.cos(lat2),x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dl);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function setGPS(p,center=false){
+  const next=[p.coords.latitude,p.coords.longitude],prev=userPosition||lastGpsPosition;
+  userPosition=next;lastGpsPosition=next;
+  if(Number.isFinite(p.coords.heading)&&p.coords.heading>=0)lastHeading=p.coords.heading;
+  else if(prev && hav(prev,next)>3)lastHeading=headingFrom(prev,next);
+  const angle=Number.isFinite(lastHeading)?lastHeading:0;
+  if(!userMarker)userMarker=L.marker(next,{icon:gpsIcon(angle),zIndexOffset:1800,interactive:false}).addTo(map);
+  else{userMarker.setLatLng(next);userMarker.setIcon(gpsIcon(angle))}
+  if(!userAccuracy)userAccuracy=L.circle(next,{radius:Math.max(5,p.coords.accuracy||20),color:"#2d6cdf",weight:1,fillColor:"#2d6cdf",fillOpacity:.09,interactive:false}).addTo(map);
+  else userAccuracy.setLatLng(next).setRadius(Math.max(5,p.coords.accuracy||20));
+  updateCenteredState();
+  if(center){map.flyTo(next,17,{duration:.55});centeredOnUser=true;$("locationFab").classList.add("located")}
+  if(navActive)updateNavProgress();
+  if(sheetOpen)render();
+  status("");
+}
+async function locate(center=true,setFrom=false){
+  if(!navigator.geolocation){status(t("locErr"));return}
+  try{const p=await navigator.permissions?.query?.({name:"geolocation"});if(p?.state==="denied"){status(lang==="lt"?"Vietos leidimas užblokuotas. Įjunkite Location naršyklės svetainės nustatymuose.":"Location permission is blocked. Allow Location in this site's browser settings.");return}}catch{}
+  status(t("locating"),true);
+  const success=p=>{setGPS(p,center);if(setFrom)setNavPoint("from",userPosition,t("gps"))};
+  const fallback=e=>{
+    if(e?.code===1){status(lang==="lt"?"Vietos leidimas atmestas. Leiskite naršyklei naudoti vietą.":"Location access was denied. Allow location for this site and try again.");return}
+    navigator.geolocation.getCurrentPosition(success,err=>{status(err?.code===3?(lang==="lt"?"Vietos nustatymas užtruko. Pabandykite lauke.":"Getting a GPS fix timed out. Try outdoors."):t("locErr"))},{enableHighAccuracy:true,timeout:16000,maximumAge:0});
+  };
+  navigator.geolocation.getCurrentPosition(success,fallback,{enableHighAccuracy:false,timeout:7000,maximumAge:30000});
+}
+function startWatch(){
+  if(watchId!==null||!navigator.geolocation)return;
+  watchId=navigator.geolocation.watchPosition(p=>{setGPS(p,false)},()=>{}, {enableHighAccuracy:true,maximumAge:1500,timeout:12000});
+}
+function stopWatch(){if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}}
+$("locationFab").onclick=()=>locate(true,false);
+
+// ---------------- Navigation ----------------
+const nav={from:null,to:null};
+let pickMode=null,routeCandidates=[],selectedRoute=0,routeLayers=[],routeLine=null,routeRequest=0,searchTimer=null,navActive=false,navSteps=[],navStepIndex=1,navExpanded=false,streetEnrichToken=0;
+
+function clearNavPoints(){for(const k of ["from","to"]){if(nav[k]?.marker)map.removeLayer(nav[k].marker);nav[k]=null}}
+function setNavPoint(w,ll,label){
+  if(nav[w]?.marker)map.removeLayer(nav[w].marker);
+  const marker=L.circleMarker(ll,{radius:9,color:"#fff",weight:3,fillColor:w==="from"?"#1d9b67":"#e9553f",fillOpacity:1}).addTo(map);
+  nav[w]={ll:[...ll],label,marker};
+  if(w==="to")$("mainSearchInput").value=label||"";
+  render();
+  if(nav.from&&nav.to)getRoute();
+}
+function setDestinationFromPOI(e,kind){
+  const ll=parseLL(e),name=e.tags?.name||t(kind);
+  nav.to={ll,name,label:name,marker:null};
+  if(!nav.from&&userPosition)setNavPoint("from",userPosition,t("gps"));
+  tab="nav";openSheet("nav",{peek:!!nav.from});render();
+  if(nav.from)getRoute();else locate(false,true);
+}
+function savedPlace(kind){return store.get(kind,null)}
+function savePlace(kind,place){store.set(kind,place);render()}
+function chooseSaved(kind){
+  const p=savedPlace(kind);if(!p){openSavedPlaceModal(kind);return}
+  if(!nav.from&&userPosition)setNavPoint("from",userPosition,t("gps"));
+  if(!nav.from){locate(false,true);return}
+  setNavPoint("to",p.ll,p.address);openSheet("nav",{peek:false});
+}
+function openSavedPlaceModal(kind){
+  const title=kind==="home"?t("home"):t("work");
+  openModal(`<div class="modalHead"><h2>${title}</h2><button class="closeBtn" data-mclose>×</button></div><p>${lang==="lt"?"Įrašykite adresą. Jis bus išsaugotas šiame įrenginyje.":"Enter an address. It will be saved on this device."}</p><input class="modalInput" id="savedAddress" placeholder="Žemaičių g. 1, Kaunas"><div class="modalActions"><button class="btn" data-mclose>${t("cancel")}</button><button class="btn primary" id="savePlaceBtn">${t("save")}</button></div>`);
+  $("savePlaceBtn").onclick=async()=>{
+    const q=$("savedAddress").value.trim();if(q.length<3)return;
+    status(t("finding"),true);
+    try{const j=await geocode(q);if(!j.length)throw new Error("No results");const x=j[0];savePlace(kind,{address:x.display_name.split(",").slice(0,4).join(", "),ll:[+x.lat,+x.lon]});closeModal();status("")}catch{status(t("routeErr"))}
+  }
+}
+function geocode(q){return fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=${lang}&countrycodes=lt&viewbox=23.70,54.98,24.20,54.78&bounded=1&q=${encodeURIComponent(q)}`,{mode:"cors",cache:"no-store",headers:{Accept:"application/json"}}).then(r=>{if(!r.ok)throw new Error("Geocoder "+r.status);return r.json()})}
+function paintSearchResults(box,items,onPick){
+  box.innerHTML=items.length?items.slice(0,5).map((x,i)=>{
+    const title=x.display_name.split(",")[0],sub=x.display_name.split(",").slice(1,4).join(", ");
+    return `<button data-i="${i}"><div class="resultIcon">⌖</div><div><div class="resultName">${esc(title)}</div><div class="resultAddress">${esc(sub)}</div></div></button>`
+  }).join(""):`<div class="empty">${lang==="lt"?"Nieko nerasta":"No results"}`;
+  box.querySelectorAll("button").forEach(b=>b.onclick=()=>onPick(items[+b.dataset.i]));
+}
+function searchPlaces(q,boxId,onPick){
+  clearTimeout(searchTimer);const box=$(boxId);if(!box)return;
+  if(q.trim().length<3){box.innerHTML="";return}
+  searchTimer=setTimeout(async()=>{try{const j=await geocode(q);paintSearchResults(box,j,onPick)}catch{box.innerHTML=`<div class="empty">${t("routeErr")}</div>`}},350);
+}
+function selectSearchResult(x){
+  const label=x.display_name.split(",").slice(0,3).join(", ");
+  $("mainSearchInput").value=x.display_name.split(",")[0];
+  $("mainSearchResults").innerHTML="";$("mainSearchClear").hidden=false;
+  setNavPoint("to",[+x.lat,+x.lon],label);openSheet("nav",{peek:false});
+}
+function searchAddress(q){searchPlaces(q,"searchResults",x=>{const label=x.display_name.split(",").slice(0,3).join(", ");$("navSearch").value=x.display_name.split(",")[0];$("searchResults").innerHTML="";setNavPoint("to",[+x.lat,+x.lon],label)})}
+function startPick(w){
+  pickMode=w;closeSheet();setSettingsOpen(false);document.documentElement.classList.add("pick-active");
+  $("centerPin").style.display="block";$("pickBar").style.display="block";$("pickInfo").textContent=t("pickInfo");
+  map.closePopup();map.scrollWheelZoom.enable();
+}
+function finishPick(){
+  if(!pickMode)return;const target=pickMode,ll=[map.getCenter().lat,map.getCenter().lng];
+  pickMode=null;document.documentElement.classList.remove("pick-active");$("centerPin").style.display="none";$("pickBar").style.display="none";
+  setNavPoint(target,ll,t("select"));openSheet("nav",{peek:target==="to"});map.invalidateSize();
+}
+$("pickSelect").onclick=finishPick;
+
+function brouterUrl(a,b,alt){
+  const p=new URLSearchParams({lonlats:`${a[1]},${a[0]}|${b[1]},${b[0]}`,profile:"trekking",alternativeidx:String(alt),format:"geojson",timode:"1"});
+  const opts={avoid_unsafe:1,consider_elevation:1,consider_river:1,uphillcost:24};
+  for(const [k,v] of Object.entries(opts))p.set("profile:"+k,String(v));
+  return "https://brouter.de/brouter?"+p
+}
+function hav(a,b){
+  const R=6371000,p1=a[0]*Math.PI/180,p2=b[0]*Math.PI/180,dp=(b[0]-a[0])*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180,x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(x)))
+}
+function coordsFromFeature(f){return f?.geometry?.coordinates?.map(c=>[c[1],c[0]])||[]}
+function pathDistance(c){let d=0;for(let i=1;i<c.length;i++)d+=hav(c[i-1],c[i]);return d}
+function dedupeRoutes(rs){
+  const out=[];
+  for(const r of rs){
+    if(r.coords.length<2)continue;
+    const near=out.some(x=>Math.abs(x.distance-r.distance)<250&&x.coords.length===r.coords.length&&x.coords.every((p,i)=>i%Math.max(1,Math.floor(x.coords.length/8))!==0||hav(p,r.coords[i])<90));
+    if(!near)out.push(r)
+  }
+  return out
+}
+function turnType(diff){
+  if(Math.abs(diff)>=150)return "uturn";
+  if(diff<-100)return "sharp-left";if(diff<-35)return "left";if(diff<0)return "slight-left";
+  if(diff>100)return "sharp-right";if(diff>35)return "right";if(diff>0)return "slight-right";
+  return "straight";
+}
+function turnText(type){
+  const lt={left:"Pasukite kairėn",right:"Pasukite dešinėn","sharp-left":"Sukite staigiai kairėn","sharp-right":"Sukite staigiai dešinėn","slight-left":"Laikykitės kairiau","slight-right":"Laikykitės dešiniau",uturn:"Apsisukite",straight:"Tęskite tiesiai"};
+  const en={left:"Turn left",right:"Turn right","sharp-left":"Turn sharp left","sharp-right":"Turn sharp right","slight-left":"Keep left","slight-right":"Keep right",uturn:"Make a U-turn",straight:"Continue straight"};
+  return (lang==="lt"?lt:en)[type]||t("continue")
+}
+function makeTurnSteps(coords){
+  if(coords.length<8)return[{idx:0,type:"start",text:lang==="lt"?"Pradėkite važiuoti":"Start riding",ll:coords[0],distanceFromStart:0,street:null,tags:[]}];
+  const cum=[0];for(let i=1;i<coords.length;i++)cum[i]=cum[i-1]+hav(coords[i-1],coords[i]);
+  const steps=[{idx:0,type:"start",text:lang==="lt"?"Pradėkite važiuoti":"Start riding",ll:coords[0],distanceFromStart:0,street:null,tags:[]}];
+  let lastIdx=0,lastDistance=0;
+  for(let i=4;i<coords.length-4;i+=2){
+    if(cum[i]-lastDistance<85)continue;
+    const a=coords[Math.max(0,i-5)],b=coords[i],c=coords[Math.min(coords.length-1,i+5)];
+    const h1=headingFrom(a,b),h2=headingFrom(b,c);if(h1===null||h2===null)continue;
+    let diff=((h2-h1+540)%360)-180;
+    if(Math.abs(diff)<28)continue;
+    if(i-lastIdx<12)continue;
+    const type=turnType(diff);
+    steps.push({idx:i,type,text:turnText(type),ll:b,distanceFromStart:cum[i],street:null,tags:[]});
+    lastIdx=i;lastDistance=cum[i];
+  }
+  steps.push({idx:coords.length-1,type:"end",text:t("arrive"),ll:coords[coords.length-1],distanceFromStart:cum[cum.length-1],street:null,tags:[]});
+  return steps;
+}
+function routeBBox(coords,pad=.002){
+  let s=90,w=180,n=-90,e=-180;for(const p of coords){s=Math.min(s,p[0]);w=Math.min(w,p[1]);n=Math.max(n,p[0]);e=Math.max(e,p[1])}
+  return `${(s-pad).toFixed(5)},${(w-pad).toFixed(5)},${(n+pad).toFixed(5)},${(e+pad).toFixed(5)}`
+}
+function nearestWayName(ll,ways){
+  let best=null,bd=Infinity;
+  for(const e of ways){
+    if(!e.geometry)continue;
+    for(const p of e.geometry){const d=hav(ll,[p.lat,p.lon]);if(d<bd){bd=d;best=e.tags?.name||null}}
+  }
+  return bd<55?best:null
+}
+async function enrichSteps(route){
+  const token=++streetEnrichToken;const bb=routeBBox(route.coords);
+  const q=`[out:json][timeout:20];(way["highway"]["name"](${bb});way["highway"="steps"](${bb});node["highway"="crossing"](${bb}););out tags geom qt;`;
+  try{
+    const j=await overpass(q);if(token!==streetEnrichToken)return;
+    const ways=j.elements.filter(e=>e.type==="way"&&e.tags?.name);
+    const stairs=j.elements.filter(e=>e.type==="way"&&e.tags?.highway==="steps");
+    const crossings=j.elements.filter(e=>e.type==="node"&&e.tags?.highway==="crossing");
+    for(const step of route.steps||[]){
+      if(step.type==="start"||step.type==="end")continue;
+      step.street=nearestWayName(step.ll,ways);
+      const stairNear=stairs.some(e=>e.geometry?.some(p=>hav(step.ll,[p.lat,p.lon])<28));
+      const crossNear=crossings.some(e=>hav(step.ll,[e.lat,e.lon])<30);
+      if(stairNear)step.tags.push("stairs");
+      if(crossNear)step.tags.push("crossing");
+    }
+    if(sheetOpen)render();
+    if(navActive)updateNavOverlay();
+  }catch(e){/* route remains usable without enrichment */}
+}
+function parseHints(props,coords){
+  const arr=props?.messages;if(!Array.isArray(arr))return null;
+  const out=[];for(const m of arr){const text=typeof m==="string"?m:(m?.message||m?.text||"");const ll=m?.lat!==undefined&&m?.lon!==undefined?[+m.lat,+m.lon]:null;if(text&&ll)out.push({type:"hint",text,ll})}
+  return out.length?out:null;
+}
+async function brouterRoute(a,b,alt){
+  const r=await fetch(brouterUrl(a,b,alt),{mode:"cors",cache:"no-store",headers:{Accept:"application/geo+json, application/json"}});
+  if(!r.ok)throw new Error("BRouter HTTP "+r.status);
+  const j=await r.json(),f=j.type==="FeatureCollection"?j.features?.[0]:j,coords=coordsFromFeature(f);
+  if(coords.length<2)throw new Error("No geometry");
+  const pr=f.properties||{},distance=Number(pr["track-length"])||pathDistance(coords),time=Number(pr["total-time"])||distance/4.5,ascend=Number(pr["filtered ascend"])||0;
+  const steps=makeTurnSteps(coords);
+  return{coords,distance,time,ascend,source:"brouter",label:alt===0?t("recommended"):alt===1?t("balanced"):t("fast"),steps}
+}
+async function getRoute(){
+  if(!nav.from||!nav.to){status(t("noRoute"));return}
+  const req=++routeRequest;routeCandidates=[];selectedRoute=0;render();status(t("finding"),true);
+  try{
+    const got=await Promise.allSettled([0,1,2].map(i=>brouterRoute(nav.from.ll,nav.to.ll,i)));
+    if(req!==routeRequest)return;
+    routeCandidates=dedupeRoutes(got.filter(x=>x.status==="fulfilled").map(x=>x.value));
+    if(!routeCandidates.length)throw new Error("No routes");
+    selectedRoute=Math.max(0,routeCandidates.findIndex(r=>r.label===t("recommended")));
+    if(selectedRoute<0)selectedRoute=0;
+    drawRoutes();status("");render();if(routeLine)map.fitBounds(routeLine.getBounds(),{paddingTopLeft:[25,120],paddingBottomRight:[25,240],maxZoom:16});
+    const current=routeCandidates[selectedRoute];enrichSteps(current);
+    openSheet("nav",{peek:true});
+  }catch(e){if(req!==routeRequest)return;status(t("routeErr"));routeCandidates=[];render()}
+}
+function drawRoutes(){
+  routeLayers.forEach(l=>routeLayer.removeLayer(l));routeLayers=[];
+  for(let i=0;i<routeCandidates.length;i++){
+    const r=routeCandidates[i],line=L.polyline(r.coords,{color:i===selectedRoute?"#2d6cdf":"#7e8d95",weight:i===selectedRoute?7:4,opacity:i===selectedRoute?.96:.44,dashArray:i===selectedRoute?null:"8 7",lineCap:"round",lineJoin:"round"});
+    line.on("click",()=>selectRoute(i)).addTo(routeLayer);routeLayers.push(line);
+  }
+  routeLine=routeLayers[selectedRoute]||null
+}
+const routeLayer=L.layerGroup().addTo(map);
+function selectRoute(i){
+  if(!routeCandidates[i])return;selectedRoute=i;drawRoutes();enrichSteps(routeCandidates[i]);render();
+  if(routeLine)map.fitBounds(routeLine.getBounds(),{paddingTopLeft:[25,120],paddingBottomRight:[25,240],maxZoom:16})
+}
+function canStartNavigation(){
+  if(!userPosition||!nav.from)return false;
+  return hav(userPosition,nav.from.ll)<=75;
+}
+function setNavMapLock(on){
+  const methods=["dragging","touchZoom","scrollWheelZoom","doubleClickZoom","boxZoom","keyboard"];
+  methods.forEach(k=>{if(map[k])on?map[k].disable():map[k].enable()});
+}
+function normalizeAngle(a){return((a+180)%360+360)%360-180}
+function setMapBearing(deg){
+  if(!navActive){$("mapScene").style.transform="rotate(0deg)";return}
+  $("mapScene").style.transform=`rotate(${-deg}deg)`;
+}
+function closestRoutePoint(pos,coords){let bi=0,bd=Infinity;for(let i=0;i<coords.length;i++){const d=hav(pos,coords[i]);if(d<bd){bd=d;bi=i}}return{index:bi,distance:bd}}
+function distanceAlongRoute(coords,fromIdx,toIdx){if(!coords.length)return 0;let a=Math.max(0,Math.min(fromIdx,toIdx)),b=Math.max(0,Math.max(fromIdx,toIdx)),d=0;for(let i=a+1;i<=b;i++)d+=hav(coords[i-1],coords[i]);return d}
+function stepIcon(type){return type==="left"||type==="slight-left"||type==="sharp-left"?"←":type==="right"||type==="slight-right"||type==="sharp-right"?"→":type==="uturn"?"↶":type==="end"?"✓":"↑"}
+function navTagText(tags){
+  if(!tags?.length)return "";
+  const lt={stairs:"Laiptai",crossing:"Perėja"},en={stairs:"Stairs",crossing:"Crossing"};
+  return tags.map(x=>(lang==="lt"?lt:en)[x]||x).join(" · ");
+}
+function updateNavProgress(){
+  const r=routeCandidates[selectedRoute];if(!r||!userPosition)return;
+  const c=closestRoutePoint(userPosition,r.coords);
+  let idx=navSteps.findIndex(s=>s.type!=="start"&&s.idx>c.index-2);
+  if(idx<0)idx=navSteps.length-1;
+  if(idx>navStepIndex && c.index>=Math.max(0,navSteps[idx].idx-3))navStepIndex=idx;
+  const next=navSteps[Math.min(navStepIndex,navSteps.length-1)];
+  let bearing=lastHeading;
+  if(!Number.isFinite(bearing)&&r.coords[c.index+1])bearing=headingFrom(r.coords[c.index],r.coords[Math.min(r.coords.length-1,c.index+5)]);
+  if(Number.isFinite(bearing))setMapBearing(bearing);
+  if(navActive && userPosition && c.distance<150)map.panTo(userPosition,{animate:true,duration:.25});
+  updateCenteredState();updateNavOverlay();
+}
+function updateNavOverlay(){
+  const r=routeCandidates[selectedRoute];if(!r)return;
+  navSteps=r.steps||[];if(navStepIndex>=navSteps.length)navStepIndex=Math.max(1,navSteps.length-1);
+  const s=navSteps[Math.min(navStepIndex,navSteps.length-1)]||{text:t("continue"),distanceFromStart:0,type:"straight",tags:[]};
+  let currentIdx=0;if(userPosition)currentIdx=closestRoutePoint(userPosition,r.coords).index;
+  const dist=Math.max(0,distanceAlongRoute(r.coords,currentIdx,s.idx));
+  const prefix=s.tags?.length?navTagText(s.tags):"";
+  $("navSmall").textContent=prefix||t("nextTurn");
+  $("navInstruction").textContent=s.type==="end"?t("arrive"):(s.street?(s.text+" · "+s.street):s.text);
+  $("navInstructionDist").textContent=s.type==="end"?"":t("inDistance")(dist);
+  $("turnArrow").textContent=stepIcon(s.type);
+  const remain=Math.max(0,r.distance-(r.steps?.[Math.min(navStepIndex,r.steps.length-1)]?.distanceFromStart||0));
+  $("navEta").innerHTML=`${(remain/1000).toFixed(1)} km <small>${t("eta")} · ${t("minutes")((remain/4.5))}</small>`;
+  const list=navSteps.slice(Math.max(1,navStepIndex),navStepIndex+8).map(x=>`<div class="navTurn"><div class="navTurnIcon">${stepIcon(x.type)}</div><div><div class="navTurnText">${esc(x.type==="end"?t("arrive"):x.text)}</div>${x.street?`<span class="navTurnStreet">${esc(x.street)}</span>`:""}${x.tags?.length?`<span class="stepTag">${esc(navTagText(x.tags))}</span>`:""}</div><div class="navTurnDist">${x.type==="end"?"":esc(t("inDistance")(Math.max(0,distanceAlongRoute(r.coords,currentIdx,x.idx))) )}</div></div>`).join("");
+  $("navTurnList").innerHTML=list||`<div class="empty">${t("emptySteps")}</div>`;
+}
+function startNavigation(){
+  if(!routeCandidates[selectedRoute]){status(t("noRoute"));return}
+  if(!canStartNavigation()){status(lang==="lt"?"Priartėkite prie starto taško ir įjunkite GPS.":"Move within about 75 m of the starting point and turn on GPS.");return}
+  navActive=true;navStepIndex=1;navExpanded=false;
+  document.documentElement.classList.add("nav-active");$("navMode").style.display="block";$("navBottomCard").classList.remove("expanded");
+  setSheetOpen(false);setSettingsOpen(false);startWatch();setNavMapLock(true);
+  map.flyTo(userPosition,17,{duration:.55});centeredOnUser=true;$("locationFab").classList.add("located");
+  updateNavOverlay();setTimeout(()=>updateNavProgress(),250);
+}
+function stopNavigation({clear=true}={}){
+  navActive=false;navExpanded=false;stopWatch();setNavMapLock(false);
+  document.documentElement.classList.remove("nav-active");$("navMode").style.display="none";$("mapScene").style.transform="rotate(0deg)";
+  if(clear)clearRoute();
+  else updateCenteredState();
+}
+$("stopNav").onclick=()=>stopNavigation({clear:true});
+$("navExpand").onclick=e=>{e.stopPropagation();toggleNavDetails()};
+$("navBottomCard").onclick=e=>{if(e.target.closest("#stopNav"))return;toggleNavDetails()};
+function toggleNavDetails(){navExpanded=!navExpanded;$("navBottomCard").classList.toggle("expanded",navExpanded)}
+
+function clearRoute(){
+  routeCandidates=[];selectedRoute=0;routeLayers.forEach(l=>routeLayer.removeLayer(l));routeLayers=[];routeLine=null;routeRequest++;navStepIndex=1;streetEnrichToken++;
+  render();
+}
+
+// ---------------- Sheet / UI ----------------
+const sheet=$("sheet"),body=$("body");let tab=null,sheetOpen=false,routePeek=false,drag=null,searchMainTimer=0;
+function baseSheetOffset(){return routePeek?Math.max(120,sheet.offsetHeight-190):0}
+function syncGlobalUI(){document.documentElement.classList.toggle("sheet-open",sheetOpen);document.documentElement.classList.toggle("settings-open",$("settingsPage").classList.contains("open"));applySearchPosition()}
+function setSheetOpen(open,peek=false){
+  sheetOpen=!!open;routePeek=!!peek&&tab==="nav"&&routeCandidates.length>0;
+  sheet.classList.toggle("open",sheetOpen);sheet.classList.toggle("route-peek",sheetOpen&&routePeek);sheet.classList.remove("dragging");
+  sheet.style.transform=sheetOpen?(routePeek?`translate3d(-50%,${baseSheetOffset()}px,0)`:"translate3d(-50%,0,0)"):"translate3d(-50%,100%,0)";
+  if(!sheetOpen){tab=null;routePeek=false;$("tMap").setAttribute("aria-selected","false");$("tNav").setAttribute("aria-selected","false")}
+  syncGlobalUI();
+}
+function openSheet(next,opts={}){
+  if(document.documentElement.classList.contains("pick-active")||navActive)return;
+  setSettingsOpen(false);
+  if(sheetOpen&&tab===next){closeSheet();return}
+  tab=next;routePeek=opts.peek!==undefined?!!opts.peek:(next==="nav"&&routeCandidates.length>0);
+  $("tMap").setAttribute("aria-selected",next==="map");$("tNav").setAttribute("aria-selected",next==="nav");
+  setSheetOpen(true,routePeek);render();
+  setTimeout(()=>map.invalidateSize(),160)
+}
+function closeSheet(){setSheetOpen(false)}
+function setRouteExpanded(expanded){routePeek=!expanded;sheet.classList.toggle("route-peek",sheetOpen&&routePeek);sheet.style.transform=sheetOpen?(routePeek?`translate3d(-50%,${baseSheetOffset()}px,0)`:"translate3d(-50%,0,0)"):"translate3d(-50%,100%,0)"}
+function dragStart(e){
+  if(!sheetOpen||navActive)return;
+  if(e.target.closest("button,input,select,a,textarea,.switch,.seg,.steps,.navSearch,.quick,.layerRow,.settingOption"))return;
+  drag={start:e.clientY,dy:0,base:baseSheetOffset()};
+  sheet.classList.add("dragging");sheet.setPointerCapture?.(e.pointerId);
+}
+function dragMove(e){
+  if(!drag)return;
+  drag.dy=e.clientY-drag.start;
+  const next=Math.max(0,Math.min(sheet.offsetHeight,drag.base+drag.dy));
+  if(e.cancelable)e.preventDefault();sheet.style.transform=`translate3d(-50%,${next}px,0)`;
+}
+function dragEnd(){
+  if(!drag)return;const d=drag;drag=null;sheet.classList.remove("dragging");
+  if(tab==="nav"&&routeCandidates.length&&d.dy<-45){setRouteExpanded(true);return}
+  if(d.dy>Math.max(90,sheet.offsetHeight*.16)){closeSheet();return}
+  sheet.style.transform=sheetOpen?(routePeek?`translate3d(-50%,${baseSheetOffset()}px,0)`:"translate3d(-50%,0,0)"):"translate3d(-50%,100%,0)";
+}
+sheet.addEventListener("pointerdown",dragStart);
+sheet.addEventListener("pointermove",dragMove);
+sheet.addEventListener("pointerup",dragEnd);
+sheet.addEventListener("pointercancel",dragEnd);
+
+function renderMap(){
+  body.innerHTML=`<div class="layerLead"><h1>${t("layers")}</h1><p>${t("layersSub")}</p></div>
+  <div class="layerSection">${lang==="lt"?"Dviračių žemėlapis":"Cycling map"}</div>
+  <div class="layerRows">${layerRow("cycle","🚲",t("cycle"),lang==="lt"?"CyclOSM dviračių infrastruktūros žemėlapis":"CyclOSM bicycle infrastructure overlay")}</div>
+  <div class="layerSection">${lang==="lt"?"Vietos":"Places"}</div>
+  <div class="layerRows">${layerRow("shops","🚲",t("shops"),lang==="lt"?"Dviračių parduotuvės":"Bike shops")}${layerRow("repair","🔧",t("repair"),lang==="lt"?"Remonto stotelės ir paslaugos":"Repair stations and services")}${layerRow("rental","🚴",t("rental"),lang==="lt"?"Dviračių nuoma":"Bike rental")}</div>
+  <div class="layerFoot">${lang==="lt"?"Infrastruktūrai naudojamas CyclOSM sluoksnis, o vietoms – OpenStreetMap.":"Cycling infrastructure uses the CyclOSM overlay; places come from OpenStreetMap."}</div>`;
+  body.querySelectorAll("[data-close]").forEach(b=>b.onclick=closeSheet);
+  body.querySelectorAll("[data-layer]").forEach(b=>b.onclick=()=>toggleLayer(b.dataset.layer));
+  for(const k of ["shops","repair","rental"])if(layerMessages[k]&&layerMessages[k].startsWith("__LOADING__"))setLayerMessage(k,layerMessages[k].slice(11),true);
+}
+function layerRow(k,icon,title,sub){
+  const count=k==="cycle"?(layerState[k]?"On":""):(layerCache[k]?`${layerCache[k].length}`:"");
+  const msg=(layerMessages[k]||"").startsWith("__LOADING__")?layerMessages[k].slice(11):(layerMessages[k]||"");
+  return `<div class="layerRow"><div class="iconBox">${icon}</div><div class="layerInfo"><div class="layerName">${title}</div><div class="layerSub">${sub}</div>${count?`<div class="layerBadge">${esc(count)}</div>`:""}<div id="layerMsg-${k}" class="layerStatus ${msg&&layerLoading[k]?"loading":msg?"error":""}" style="${msg?"display:block":"display:none"}">${esc(msg)}</div></div><button class="layerAction ${layerState[k]?"on":""}" data-layer="${k}" aria-label="${title}"></button></div>`
+}
+function renderNav(){
+  const h=savedPlace("home"),w=savedPlace("work"),hasRoute=routeCandidates.length>0,r=hasRoute?routeCandidates[selectedRoute]:null;
+  const canStart=canStartNavigation();
+  const routeHtml=hasRoute?`
+    <div class="routeSummaryCard"><div class="distanceOnly">${(r.distance/1000).toFixed(1)} km</div>
+      <div class="routeSummaryActions"><button class="btn primary" id="startNavBtn" ${canStart?"":"disabled"}>${t("start")}</button><button class="btn" id="clearNav">${t("clear")}</button></div>
+      <div class="routePeekHint">${lang==="lt"?"Perstumkite meniu aukštyn, kad matytumėte visus posūkius":"Swipe the sheet up to see every turn"}</div>
+    </div>
+    <div class="routeDetails"><div class="sectionTitle">${t("steps")}</div><div class="steps">${(r.steps||[]).map((s,i)=>`<div class="step ${i===navStepIndex?"active":""}"><div class="stepIcon">${stepIcon(s.type)}</div><div class="stepMain"><b>${esc(s.text)}</b>${s.street?`<span class="stepStreet">${esc(s.street)}</span>`:""}${s.tags?.length?`<span class="stepTag">${esc(navTagText(s.tags))}</span>`:""}</div><div class="stepDist">${i<r.steps.length-1?t("inDistance")(Math.max(0,r.steps[i+1].distanceFromStart-s.distanceFromStart)):""}</div></div>`).join("")}</div></div>`
+    :nav.to?`<div class="routeCard"><div class="routeMeta">${t("finding")}</div></div>`:"";
+  body.innerHTML=`<div class="pageHead"><div><h1>${t("nav")}</h1><p>${hasRoute?(lang==="lt"?"Maršrutas paruoštas":"Route ready"):(lang==="lt"?"Kur važiuojame šiandien?":"Where are you riding today?")}</p></div><button class="closeBtn" data-close>×</button></div>
+    <div class="sectionTitle">${t("from")}</div><div class="quickGrid"><button class="quick" id="useGps"><div class="quickIcon">⌖</div><div><strong>${t("gps")}</strong><small>${nav.from?.label||t("notSet")}</small></div></button><button class="quick" id="pickFrom"><div class="quickIcon">📍</div><div><strong>${t("pick")}</strong><small>${lang==="lt"?"Smeigtukas centre":"Pin in center"}</small></div></button></div>
+    <div class="sectionTitle">${t("to")}</div><div class="navSearch"><svg class="searchIcon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="navSearch" class="navInput" placeholder="${t("search")}" value="${esc(nav.to?.label||"")}"><div id="searchResults" class="searchResults"></div></div>
+    <div class="quickGrid" style="margin-top:9px"><button class="quick" id="homeQuick"><div class="quickIcon">⌂</div><div><strong>${t("routeToHome")}</strong><small>${h?.address||t("notSet")}</small></div></button><button class="quick" id="workQuick"><div class="quickIcon">▣</div><div><strong>${t("routeToWork")}</strong><small>${w?.address||t("notSet")}</small></div></button></div>
+    <div class="btns" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px"><button class="btn" id="pickTo">📍 ${t("pick")}</button><button class="btn" id="clearNav">${t("clear")}</button></div>
+    ${routeHtml}
+    <div class="sectionTitle">${t("places")}</div><div class="card"><div class="row"><div class="rowMain"><div class="rowTitle">⌂ ${t("home")}</div><div class="rowSub">${h?.address||t("notSet")}</div></div><button class="btn" id="saveHome">${t("save")}</button></div><div class="row"><div class="rowMain"><div class="rowTitle">▣ ${t("work")}</div><div class="rowSub">${w?.address||t("notSet")}</div></div><button class="btn" id="saveWork">${t("save")}</button></div></div>`;
+  bindNavEvents();
+}
+function renderSettings(){
+  const th=settings.theme,st=settings.style,sc=settings.scale,sp=settings.searchPosition,h=savedPlace("home"),w=savedPlace("work");
+  $("settingsTitle").textContent=t("settings");$("settingsSubtitle").textContent=t("settingsSub");
+  $("settingsBody").innerHTML=`<div class="sectionTitle">${t("language")}</div><div class="seg"><button class="langOpt ${lang==="lt"?"on":""}" data-lang="lt">Lietuvių</button><button class="langOpt ${lang==="en"?"on":""}" data-lang="en">English</button></div>
+  <div class="sectionTitle">${t("theme")}</div><div class="settingOption"><div><b>${t("light")}</b><span>Light interface</span></div><button class="chip ${th==="light"?"on":""}" data-themeopt="light">${th==="light"?"✓ ":""}${t("light")}</button></div>
+  <div class="settingOption"><div><b>${t("dark")}</b><span>Dark interface</span></div><button class="chip ${th==="dark"?"on":""}" data-themeopt="dark">${th==="dark"?"✓ ":""}${t("dark")}</button></div>
+  <div class="settingOption"><div><b>${t("time")}</b><span>${new Date().getHours()>=7&&new Date().getHours()<20?"☀️":"🌙"} ${lang==="lt"?"Pagal įrenginio laiką":"Uses your device clock"}</span></div><button class="chip ${th==="time"?"on":""}" data-themeopt="time">${th==="time"?"✓ ":""}${t("time")}</button></div>
+  <div class="sectionTitle">${t("style")}</div><div class="settingOption"><div><b>${t("liquid")}</b><span>Blurred, translucent cards</span></div><button class="chip ${st==="liquid"?"on":""}" data-styleopt="liquid">${st==="liquid"?"✓ ":""}${t("liquid")}</button></div>
+  <div class="settingOption"><div><b>${t("classic")}</b><span>Solid cards and borders</span></div><button class="chip ${st==="classic"?"on":""}" data-styleopt="classic">${st==="classic"?"✓ ":""}${t("classic")}</button></div>
+  <div class="sectionTitle">${t("scale")}</div><div class="seg"><button data-scale="never" class="${sc==="never"?"on":""}">${t("never")}</button><button data-scale="zoom" class="${sc==="zoom"?"on":""}">${t("zoomOnly")}</button><button data-scale="always" class="${sc==="always"?"on":""}">${t("always")}</button></div>
+  <div class="sectionTitle">${t("searchPosition")}</div><div class="seg"><button data-searchpos="top" class="${sp==="top"?"on":""}">${t("searchTop")}</button><button data-searchpos="bottom" class="${sp==="bottom"?"on":""}">${t("searchBottom")}</button></div>
+  <div class="sectionTitle">${t("places")}</div><div class="card"><div class="row"><div class="rowMain"><div class="rowTitle">⌂ ${t("home")}</div><div class="rowSub">${h?.address||t("notSet")}</div></div><button class="btn" data-place="home">${t("save")}</button></div><div class="row"><div class="rowMain"><div class="rowTitle">▣ ${t("work")}</div><div class="rowSub">${w?.address||t("notSet")}</div></div><button class="btn" data-place="work">${t("save")}</button></div></div>
+  <div class="sectionTitle">GPS</div><button class="btn full secondary" id="settingsLocate">⌖ ${t("center")}</button>`;
+  bindSettingsEvents()
+}
+function setSettingsOpen(open){const el=$("settingsPage");if(!el)return;if(open){closeSheet();el.classList.add("open");renderSettings()}else el.classList.remove("open");syncGlobalUI()}
+function applySearchPosition(){const el=$("mainSearch");if(!el)return;el.dataset.position=settings.searchPosition||"top";el.querySelector("#mainSearchInput").placeholder=t("search")}
+function render(){if(!sheetOpen)return;if(tab==="map")renderMap();else if(tab==="nav")renderNav()}
+function bindNavEvents(){
+  body.querySelectorAll("[data-close]").forEach(b=>b.onclick=closeSheet);
+  $("useGps")?.addEventListener("click",()=>locate(false,true));$("pickFrom")?.addEventListener("click",()=>startPick("from"));$("pickTo")?.addEventListener("click",()=>startPick("to"));
+  $("navSearch")?.addEventListener("input",e=>searchAddress(e.target.value));$("homeQuick")?.addEventListener("click",()=>chooseSaved("home"));$("workQuick")?.addEventListener("click",()=>chooseSaved("work"));
+  $("clearNav")?.addEventListener("click",()=>{clearNavPoints();clearRoute();openSheet("nav",{peek:false})});$("saveHome")?.addEventListener("click",()=>openSavedPlaceModal("home"));$("saveWork")?.addEventListener("click",()=>openSavedPlaceModal("work"));
+  $("startNavBtn")?.addEventListener("click",startNavigation);body.querySelectorAll("[data-route]").forEach(b=>b.onclick=()=>selectRoute(+b.dataset.route))
+}
+function bindSettingsEvents(){
+  const sb=$("settingsBody");
+  sb.querySelectorAll("[data-lang]").forEach(b=>b.onclick=()=>{lang=b.dataset.lang;settings.language=lang;store.set("lang",lang);try{localStorage.setItem("kb-lang",lang)}catch{}applyTranslations();renderSettings()});
+  sb.querySelectorAll("[data-themeopt]").forEach(b=>b.onclick=()=>{settings.theme=b.dataset.themeopt;store.set("theme",settings.theme);applyTheme();renderSettings()});
+  sb.querySelectorAll("[data-styleopt]").forEach(b=>b.onclick=()=>{settings.style=b.dataset.styleopt;store.set("style",settings.style);applyTheme();renderSettings()});
+  sb.querySelectorAll("[data-scale]").forEach(b=>b.onclick=()=>{settings.scale=b.dataset.scale;store.set("scale",settings.scale);updateScaleVisibility();renderSettings()});
+  sb.querySelectorAll("[data-searchpos]").forEach(b=>b.onclick=()=>{settings.searchPosition=b.dataset.searchpos;store.set("searchPosition",settings.searchPosition);applySearchPosition();renderSettings()});
+  sb.querySelectorAll("[data-place]").forEach(b=>b.onclick=()=>openSavedPlaceModal(b.dataset.place));$("settingsLocate")?.addEventListener("click",()=>locate(true,false))
+}
+function applyTranslations(){document.documentElement.lang=lang;document.title=lang==="lt"?"Kaunas dviračiu":"Kaunas by Bike";$("tMap").querySelector("span").textContent=t("map");$("tNav").querySelector("span").textContent=t("nav");applySearchPosition()}
+function toggleTab(next){if(sheetOpen&&tab===next)closeSheet();else openSheet(next,{peek:next==="nav"&&routeCandidates.length>0})}
+$("tMap").onclick=()=>toggleTab("map");$("tNav").onclick=()=>toggleTab("nav");$("settingsBtn").onclick=()=>setSettingsOpen(true);$("settingsClose").onclick=()=>setSettingsOpen(false);
+
+// ---------------- Modal ----------------
+function openModal(html){$("modalBody").innerHTML=html;$("modal").style.display="flex";$("modal").querySelectorAll("[data-mclose]").forEach(b=>b.onclick=closeModal)}function closeModal(){$("modal").style.display="none"}
+function openHoursModal(kind,id,name,current){openModal(`<div class="modalHead"><h2>${esc(name)}</h2><button class="closeBtn" data-mclose>×</button></div><p>${t("hoursHint")}</p><input class="modalInput" id="hoursInput" value="${esc(current)}"><div class="modalActions"><button class="btn" data-mclose>${t("cancel")}</button><button class="btn primary" id="hoursSave">${t("saveHours")}</button></div>`);$("hoursSave").onclick=()=>{const all=store.get("hours",{});const v=$("hoursInput").value.trim();if(v)all[kind+":"+id]=v;else delete all[kind+":"+id];store.set("hours",all);closeModal();if(layerState[kind])drawLayer(kind)}}
+
+// init: nothing selected and sheet closed
+applyTranslations();applyTheme();applySearchPosition();setSheetOpen(false);setSettingsOpen(false);updateScaleVisibility();
+map.on("move",updateCenteredState);map.on("zoomend",updateCenteredState);
+$("mainSearchInput").addEventListener("input",e=>{$("mainSearchClear").hidden=!e.target.value.trim();searchPlaces(e.target.value,"mainSearchResults",selectSearchResult)});
+$("mainSearchClear").onclick=()=>{$("mainSearchInput").value="";$("mainSearchResults").innerHTML="";$("mainSearchClear").hidden=true};
+
+</script>
+</body>
+</html>
